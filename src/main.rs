@@ -1,5 +1,5 @@
 use nalgebra::{Matrix3, Vector3};
-use std::{io, thread, time::Duration};
+use std::{io, thread, time::{Duration, Instant}};
 use std::io::Write;
 use crossterm::{
     cursor, terminal::{self, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
@@ -10,16 +10,6 @@ use crossterm::{
 struct FrameBuffer {
     buffer: Vec<char>,
     z_buffer: Vec<f32>,
-}
-
-struct ScreenSize {
-    width: usize,
-    height: usize,
-}
-
-struct CameraSettings {
-    distance_from_cam: f32,
-    k1: f32,
 }
 
 impl FrameBuffer {
@@ -48,6 +38,87 @@ impl FrameBuffer {
         write!(stdout, "{}", output)?;
         stdout.flush()?;
         Ok(())
+    }
+}
+
+struct ScreenSize {
+    width: usize,
+    height: usize,
+}
+
+struct CameraSettings {
+    distance_from_cam: f32,
+    k1: f32,
+}
+
+struct DoubleBufferedRenderer {
+    front: FrameBuffer,
+    back: FrameBuffer,
+    screen_size: ScreenSize,
+}
+
+impl DoubleBufferedRenderer {
+    fn new(width: usize, height: usize) -> Self {
+        Self {
+            front: FrameBuffer::new(width, height),
+            back: FrameBuffer::new(width, height),
+            screen_size: ScreenSize { width, height },
+        }
+    }
+
+    fn swap(&mut self) {
+        std::mem::swap(&mut self.front, &mut self.back);
+    }
+
+    fn back_buffer(&mut self) -> &mut FrameBuffer {
+        &mut self.back
+    }
+
+    fn render(&self, stdout: &mut impl Write) -> io::Result<()> {
+        self.front.render(stdout, &self.screen_size)
+    }
+}
+struct FrameStats {
+    last_frame_time: Instant,
+    frame_count: u32,
+    fps: u32,
+    last_fps_update: Instant,
+    target_frame_time: Duration,
+}
+impl FrameStats {
+    fn new(target_fps: u32) -> Self {
+        Self {
+            last_frame_time: Instant::now(),
+            frame_count: 0,
+            fps: 0,
+            last_fps_update: Instant::now(),
+            target_frame_time: Duration::from_secs_f32(1.0 / target_fps as f32),
+        }
+    }
+
+    fn begin_frame(&mut self) {
+        self.last_frame_time = Instant::now();
+    }
+
+    fn end_frame(&mut self) -> Duration {
+        let elapsed = self.last_frame_time.elapsed();
+
+        // FPS计算
+        self.frame_count += 1;
+        if self.last_fps_update.elapsed().as_secs_f32() >= 1.0 {
+            self.fps = self.frame_count;
+            self.frame_count = 0;
+            self.last_fps_update = Instant::now();
+        }
+
+        // 帧率控制
+        if elapsed < self.target_frame_time {
+            let sleep_time = self.target_frame_time - elapsed;
+            thread::sleep(sleep_time);
+            self.target_frame_time
+        } else {
+            elapsed
+        }
     }
 }
 
@@ -129,44 +200,57 @@ fn main() -> io::Result<()> {
     terminal::enable_raw_mode()?;
     stdout.execute(EnterAlternateScreen)?;
     stdout.execute(cursor::Hide)?;
-    stdout.execute(terminal::Clear(ClearType::All))?; // 初始清屏一次
+    stdout.execute(terminal::Clear(ClearType::All))?;
 
     // 获取终端实际尺寸
     let (term_width, term_height) = terminal::size()?;
     let screen_size = ScreenSize {
         width: term_width as usize,
-        height: (term_height as usize).saturating_sub(1), // 留一行给可能的提示信息
+        height: (term_height as usize).saturating_sub(1),
     };
 
     let cube_width = 40.0;
-    let mut frame_buffer = FrameBuffer::new(screen_size.width, screen_size.height);
     let camera_settings = CameraSettings {
         distance_from_cam: 100.0,
         k1: 40.0,
     };
 
-    let mut angles = (0.0, 0.0, 0.0); // (a, b, c)
+    let mut renderer = DoubleBufferedRenderer::new(screen_size.width, screen_size.height);
+    let mut angles = (0.0, 0.0, 0.0);
+    let mut frame_stats = FrameStats::new(30); // 目标60FPS
 
     loop {
-        // 重置帧缓冲区
-        frame_buffer.clear(' ');
+        frame_stats.begin_frame();
+
+        // 清空后缓冲区
+        renderer.back_buffer().clear(' ');
 
         // 计算旋转矩阵
         let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
 
-        // 绘制立方体
-        draw_cube(&mut frame_buffer, &screen_size, &camera_settings, &rotation_matrix, cube_width);
+        // 在后缓冲区绘制立方体
+        draw_cube(
+            renderer.back_buffer(),
+            &screen_size,
+            &camera_settings,
+            &rotation_matrix,
+            cube_width
+        );
 
-        // 渲染到终端
-        stdout.execute(cursor::MoveTo(0, 0))?; // 只移动光标，不清屏
+        // 交换缓冲区
+        renderer.swap();
 
-        // 渲染帧缓冲区内容
-        frame_buffer.render(&mut stdout, &screen_size)?;
+        // 渲染前缓冲区到终端
+        stdout.execute(cursor::MoveTo(0, 0))?;
+        renderer.render(&mut stdout)?;
 
-        // 在最后一行显示帮助信息
+        // 显示帮助信息和帧率
+        let frame_time = frame_stats.end_frame();
         write!(
             stdout,
-            "Press 'q' to quit | Size: {}x{} | Angles: {:.1},{:.1},{:.1}",
+            "FPS: {:3} | Frame: {:3.1}ms | Size: {}x{} | Angles: {:.1},{:.1},{:.1} | Press 'q' to quit",
+            frame_stats.fps,
+            frame_time.as_secs_f32() * 1000.0,
             screen_size.width,
             screen_size.height,
             angles.0, angles.1, angles.2
@@ -175,7 +259,7 @@ fn main() -> io::Result<()> {
 
         // 更新旋转角度
         angles.0 += 0.05;
-        angles.1 += 0.05;
+        angles.1 += 0.03;
         angles.2 += 0.01;
 
         // 处理退出
@@ -186,8 +270,6 @@ fn main() -> io::Result<()> {
                 }
             }
         }
-
-        thread::sleep(Duration::from_micros(80000));
     }
 
     // 恢复终端
