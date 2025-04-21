@@ -1,0 +1,9 @@
+[package]
+name = "spin-cube"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+crossterm = "0.29"
+nalgebra = "0.32"
