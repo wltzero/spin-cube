@@ -1,3 +1,4 @@
+// 该文件已被ring_buffer.rs替代
 
 
 use std::io;

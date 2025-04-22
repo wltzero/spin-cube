@@ -10,7 +10,7 @@ use crossterm::{
 };
 use std::io::Write;
 use std::{io, time::Duration};
-use structs::double_buffer::*;
+use structs::ring_buffer::*;
 use structs::frame_stat::*;
 use structs::screen::*;
 use utils::handler::*;
@@ -38,9 +38,10 @@ fn main() -> io::Result<()> {
         k1: params.k1,
     };
 
-    let mut renderer = DoubleBufferedRenderer::new(screen_size.width, screen_size.height);
+    // 使用环形缓冲区
+    let mut renderer = RingBufferedRenderer::new(screen_size.width, screen_size.height, 3);
     let mut angles = (0.0, 0.0, 0.0);
-    let mut frame_stats = FrameStats::new(params.target_fps); // 目标60FPS
+    let mut frame_stats = FrameStats::new(params.target_fps);
 
     loop {
         // 检查终端尺寸是否变化
@@ -52,30 +53,30 @@ fn main() -> io::Result<()> {
                 width: term_width as usize,
                 height: (term_height as usize).saturating_sub(1),
             };
-            renderer = DoubleBufferedRenderer::new(screen_size.width, screen_size.height);
+            renderer = RingBufferedRenderer::new(screen_size.width, screen_size.height, 10);
         }
 
         frame_stats.begin_frame();
 
-        // 清空后缓冲区
-        renderer.back_buffer().clear(' ');
+        // 清空当前缓冲区
+        renderer.current_buffer().clear(' ');
 
         // 计算旋转矩阵
         let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
 
-        // 在后缓冲区绘制立方体
+        // 在当前缓冲区绘制立方体
         draw_cube(
-            renderer.back_buffer(),
+            renderer.current_buffer(),
             &screen_size,
             &camera_settings,
             &rotation_matrix,
             cube_width
         );
 
-        // 交换缓冲区
-        renderer.swap();
+        // 切换到下一个缓冲区
+        renderer.next_buffer();
 
-        // 渲染前缓冲区到终端
+        // 渲染当前缓冲区到终端
         stdout.execute(cursor::MoveTo(0, 0))?;
         renderer.render(&mut stdout)?;
 
