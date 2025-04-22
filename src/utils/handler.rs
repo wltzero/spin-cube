@@ -17,10 +17,13 @@ pub fn calculate_for_point(
     let xp = (screen_size.width as f32 / 2.0 + camera_settings.k1 * ooz * rotated.x * 2.0) as usize;
     let yp = (screen_size.height as f32 / 2.0 + camera_settings.k1 * ooz * rotated.y) as usize;
 
-    if let Some(idx) = frame_buffer.buffer.get_mut(xp + yp * screen_size.width) {
-        if ooz > frame_buffer.z_buffer[xp + yp * screen_size.width] {
-            frame_buffer.z_buffer[xp + yp * screen_size.width] = ooz;
-            *idx = ch;
+    // 添加边界检查
+    if xp < screen_size.width && yp < screen_size.height {
+        if let Some(idx) = frame_buffer.buffer.get_mut(xp + yp * screen_size.width) {
+            if ooz > frame_buffer.z_buffer[xp + yp * screen_size.width] {
+                frame_buffer.z_buffer[xp + yp * screen_size.width] = ooz;
+                *idx = ch;
+            }
         }
     }
 }

@@ -26,8 +26,8 @@ fn main() -> io::Result<()> {
     stdout.execute(terminal::Clear(ClearType::All))?;
 
     // 获取终端实际尺寸
-    let (term_width, term_height) = terminal::size()?;
-    let screen_size = ScreenSize {
+    let (mut term_width, mut term_height) = terminal::size()?;
+    let mut screen_size = ScreenSize {
         width: term_width as usize,
         height: (term_height as usize).saturating_sub(1),
     };
@@ -43,6 +43,18 @@ fn main() -> io::Result<()> {
     let mut frame_stats = FrameStats::new(params.target_fps); // 目标60FPS
 
     loop {
+        // 检查终端尺寸是否变化
+        let (new_width, new_height) = terminal::size()?;
+        if new_width != term_width || new_height != term_height {
+            term_width = new_width;
+            term_height = new_height;
+            screen_size = ScreenSize {
+                width: term_width as usize,
+                height: (term_height as usize).saturating_sub(1),
+            };
+            renderer = DoubleBufferedRenderer::new(screen_size.width, screen_size.height);
+        }
+
         frame_stats.begin_frame();
 
         // 清空后缓冲区

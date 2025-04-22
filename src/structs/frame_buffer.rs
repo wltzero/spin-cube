@@ -23,15 +23,11 @@ impl FrameBuffer {
 
     pub fn render(&self, stdout: &mut impl Write, screen_size: &ScreenSize) -> io::Result<()> {
         stdout.execute(cursor::MoveTo(0, 0))?;
-        let mut output = String::with_capacity(screen_size.width * screen_size.height + screen_size.height);
-
         for y in 0..screen_size.height {
             let line_start = y * screen_size.width;
             let line_end = line_start + screen_size.width;
-            output.push_str(&self.buffer[line_start..line_end].iter().collect::<String>());
+            write!(stdout, "{}", &self.buffer[line_start..line_end].iter().collect::<String>())?;
         }
-
-        write!(stdout, "{}", output)?;
         stdout.flush()?;
         Ok(())
     }
