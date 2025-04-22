@@ -53,66 +53,12 @@ pub fn draw_cube(
     while i < half_width {
         let mut j = -half_width;
         while j < half_width {
-            calculate_for_point(
-                i,
-                j,
-                -half_width,
-                '@',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
-            calculate_for_point(
-                half_width,
-                j,
-                i,
-                '$',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
-            calculate_for_point(
-                -half_width,
-                j,
-                -i,
-                '~',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
-            calculate_for_point(
-                -i,
-                j,
-                half_width,
-                '#',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
-            calculate_for_point(
-                i,
-                -half_width,
-                -j,
-                ';',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
-            calculate_for_point(
-                i,
-                half_width,
-                j,
-                '+',
-                frame_buffer,
-                screen_size,
-                camera_settings,
-                rotation_matrix,
-            );
+            calculate_for_point(i, j, -half_width, '@', frame_buffer, screen_size, camera_settings, rotation_matrix, );
+            calculate_for_point(half_width, j, i, '$', frame_buffer, screen_size, camera_settings, rotation_matrix, );
+            calculate_for_point(-half_width, j, -i, '~', frame_buffer, screen_size, camera_settings, rotation_matrix, );
+            calculate_for_point(-i, j, half_width, '#', frame_buffer, screen_size, camera_settings, rotation_matrix, );
+            calculate_for_point(i, -half_width, -j, ';', frame_buffer, screen_size, camera_settings, rotation_matrix, );
+            calculate_for_point(i, half_width, j, '+', frame_buffer, screen_size, camera_settings, rotation_matrix, );
             j += step;
         }
         i += step;
