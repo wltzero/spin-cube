@@ -14,8 +14,10 @@ use structs::ring_buffer::*;
 use structs::frame_stat::*;
 use structs::screen::*;
 use utils::handler::*;
+use tokio::sync::mpsc;
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     let params = Parameter::parse(); // 解析命令行参数
     
     let mut stdout = io::stdout();
@@ -38,10 +40,33 @@ fn main() -> io::Result<()> {
         k1: params.k1,
     };
 
-    // 使用环形缓冲区
+    // 使用环形缓冲区，设置3个缓冲区
     let mut renderer = RingBufferedRenderer::new(screen_size.width, screen_size.height, 3);
     let mut angles = (0.0, 0.0, 0.0);
     let mut frame_stats = FrameStats::new(params.target_fps);
+
+    // 创建通道用于计算协程和主线程通信
+    let (tx, mut rx) = mpsc::channel(1);
+
+    // 启动计算协程
+    tokio::spawn(async move {
+        loop {
+            // 计算旋转矩阵
+            let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
+
+            // 发送计算结果到主线程
+            if let Err(_) = tx.send((rotation_matrix, angles)).await {
+                break;
+            }
+
+            // 更新旋转角度
+            angles.0 += 0.05;
+            angles.1 += 0.05;
+            angles.2 += 0.01;
+
+            tokio::time::sleep(Duration::from_millis(16)).await;
+        }
+    });
 
     loop {
         // 检查终端尺寸是否变化
@@ -53,7 +78,7 @@ fn main() -> io::Result<()> {
                 width: term_width as usize,
                 height: (term_height as usize).saturating_sub(1),
             };
-            renderer = RingBufferedRenderer::new(screen_size.width, screen_size.height, 10);
+            renderer = RingBufferedRenderer::new(screen_size.width, screen_size.height, 50);
         }
 
         frame_stats.begin_frame();
@@ -61,17 +86,17 @@ fn main() -> io::Result<()> {
         // 清空当前缓冲区
         renderer.current_buffer().clear(' ');
 
-        // 计算旋转矩阵
-        let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
-
-        // 在当前缓冲区绘制立方体
-        draw_cube(
-            renderer.current_buffer(),
-            &screen_size,
-            &camera_settings,
-            &rotation_matrix,
-            cube_width
-        );
+        // 接收计算协程的结果
+        if let Ok((rotation_matrix, angles)) = rx.try_recv() {
+            // 在当前缓冲区绘制立方体
+            draw_cube(
+                renderer.current_buffer(),
+                &screen_size,
+                &camera_settings,
+                &rotation_matrix,
+                cube_width
+            );
+        }
 
         // 切换到下一个缓冲区
         renderer.next_buffer();
@@ -92,11 +117,6 @@ fn main() -> io::Result<()> {
             angles.0, angles.1, angles.2
         )?;
         stdout.flush()?;
-
-        // 更新旋转角度
-        angles.0 += 0.05;
-        angles.1 += 0.05;
-        angles.2 += 0.01;
 
         // 处理退出
         if poll(Duration::from_millis(0))? {
