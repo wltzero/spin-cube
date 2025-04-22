@@ -56,7 +56,7 @@ async fn main() -> io::Result<()> {
             let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
 
             // 发送计算结果到主线程
-            if let Err(_) = tx.send(rotation_matrix).await {
+            if let Err(_) = tx.send((rotation_matrix,angles)).await {
                 break;
             }
 
@@ -88,7 +88,7 @@ async fn main() -> io::Result<()> {
         renderer.current_buffer().clear(' ');
 
         // 接收计算协程的结果
-        if let Ok(rotation_matrix) = rx.try_recv() {
+        if let Ok((rotation_matrix,angles)) = rx.try_recv() {
             // 在当前缓冲区绘制立方体
             draw_cube(
                 renderer.current_buffer(),
@@ -97,27 +97,28 @@ async fn main() -> io::Result<()> {
                 &rotation_matrix,
                 cube_width,
             );
+            // 切换到下一个缓冲区
+            renderer.next_buffer();
+
+            // 渲染当前缓冲区到终端
+            stdout.execute(cursor::MoveTo(0, 0))?;
+            renderer.render(&mut stdout)?;
+
+            // 显示帮助信息和帧率
+            let frame_time = frame_stats.end_frame();
+            write!(
+                stdout,
+                "FPS: {:3} | Frame: {:3.1}ms | Size: {}x{} | Angles: {:.1},{:.1},{:.1} | Press 'q' to quit",
+                frame_stats.fps,
+                frame_time.as_secs_f32() * 1000.0,
+                screen_size.width,
+                screen_size.height,
+                angles.0, angles.1, angles.2
+            )?;
+            stdout.flush()?;
         }
 
-        // 切换到下一个缓冲区
-        renderer.next_buffer();
-
-        // 渲染当前缓冲区到终端
-        stdout.execute(cursor::MoveTo(0, 0))?;
-        renderer.render(&mut stdout)?;
-
-        // 显示帮助信息和帧率
-        let frame_time = frame_stats.end_frame();
-        write!(
-            stdout,
-            "FPS: {:3} | Frame: {:3.1}ms | Size: {}x{} | Angles: {:.1},{:.1},{:.1} | Press 'q' to quit",
-            frame_stats.fps,
-            frame_time.as_secs_f32() * 1000.0,
-            screen_size.width,
-            screen_size.height,
-            angles.0, angles.1, angles.2
-        )?;
-        stdout.flush()?;
+        
 
         // 处理退出
         if poll(Duration::from_millis(0))? {

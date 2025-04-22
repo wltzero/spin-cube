@@ -9,6 +9,6 @@ pub struct Parameter {
     #[arg(short, default_value_t = 40.0)]
     // 投影缩放因子，默认40，值越大物体显示越大，近大远小效果越强
     pub k1: f32,
-    #[arg(short, default_value_t = 40.0)] // 方块大小，默认40
+    #[arg(short, default_value_t = 30.0)] // 方块大小，默认40
     pub cube_width: f32,
 }
