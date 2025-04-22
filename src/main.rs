@@ -56,7 +56,7 @@ async fn main() -> io::Result<()> {
             let rotation_matrix = calculate_rotation_matrix(angles.0, angles.1, angles.2);
 
             // 发送计算结果到主线程
-            if let Err(_) = tx.send((rotation_matrix, angles)).await {
+            if let Err(_) = tx.send(rotation_matrix).await {
                 break;
             }
 
@@ -88,7 +88,7 @@ async fn main() -> io::Result<()> {
         renderer.current_buffer().clear(' ');
 
         // 接收计算协程的结果
-        if let Ok((rotation_matrix, angles)) = rx.try_recv() {
+        if let Ok(rotation_matrix) = rx.try_recv() {
             // 在当前缓冲区绘制立方体
             draw_cube(
                 renderer.current_buffer(),
