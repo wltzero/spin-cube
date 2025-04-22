@@ -1,7 +1,7 @@
+use crate::structs::screen::ScreenSize;
+use crossterm::{cursor, ExecutableCommand};
 use std::io;
 use std::io::Write;
-use crossterm::{cursor, ExecutableCommand};
-use crate::structs::screen::ScreenSize;
 
 pub struct FrameBuffer {
     pub buffer: Vec<char>,
@@ -26,7 +26,11 @@ impl FrameBuffer {
         for y in 0..screen_size.height {
             let line_start = y * screen_size.width;
             let line_end = line_start + screen_size.width;
-            write!(stdout, "{}", &self.buffer[line_start..line_end].iter().collect::<String>())?;
+            write!(
+                stdout,
+                "{}",
+                &self.buffer[line_start..line_end].iter().collect::<String>()
+            )?;
         }
         stdout.flush()?;
         Ok(())

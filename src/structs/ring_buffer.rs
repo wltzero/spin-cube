@@ -1,8 +1,8 @@
+use crate::structs::frame_buffer::FrameBuffer;
+use crate::structs::screen::ScreenSize;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::io;
 use std::io::Write;
-use crate::structs::screen::ScreenSize;
-use crate::structs::frame_buffer::FrameBuffer;
-use ringbuffer::{RingBuffer,AllocRingBuffer};
 
 pub struct RingBufferedRenderer {
     buffers: AllocRingBuffer<FrameBuffer>,
@@ -29,10 +29,13 @@ impl RingBufferedRenderer {
     }
 
     pub fn next_buffer(&mut self) {
-        self.current_index += 1;
+        self.current_index = (self.current_index + 1) % self.buffers.len();
     }
 
     pub fn render(&self, stdout: &mut impl Write) -> io::Result<()> {
-        self.buffers.get(self.current_index).unwrap().render(stdout, &self.screen_size)
+        self.buffers
+            .get(self.current_index)
+            .unwrap()
+            .render(stdout, &self.screen_size)
     }
 }

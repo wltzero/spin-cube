@@ -4,22 +4,23 @@ mod utils;
 use crate::structs::parameter::*;
 use clap::Parser;
 use crossterm::{
-    cursor, event::{poll, read, Event, KeyCode},
+    cursor,
+    event::{poll, read, Event, KeyCode},
     terminal::{self, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use std::io::Write;
 use std::{io, time::Duration};
-use structs::ring_buffer::*;
 use structs::frame_stat::*;
+use structs::ring_buffer::*;
 use structs::screen::*;
-use utils::handler::*;
 use tokio::sync::mpsc;
+use utils::handler::*;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let params = Parameter::parse(); // 解析命令行参数
-    
+
     let mut stdout = io::stdout();
     // 初始化终端
     terminal::enable_raw_mode()?;
@@ -94,7 +95,7 @@ async fn main() -> io::Result<()> {
                 &screen_size,
                 &camera_settings,
                 &rotation_matrix,
-                cube_width
+                cube_width,
             );
         }
 
